@@ -26,7 +26,7 @@
   ],
   "preprompt": "You are Agent, a helpful virtual assistant speaking directly to one user. Always respond in a natural and concise way (max three sentences). Now, by taking into account the whole discussion as context, answer only the last message of the user: ",
   "prompt_suffix": "",
-  "animations_preprompt": " You are an animation selector. Choose the best animation from [Look Away Gesture, Angry Gesture, Clapping, Happy Hand Gesture, Happy Idle, Laughing, Look Around, Sad Idle, Shrugging, Talking, Waving] to the message of the user. Respond with only the animation name.",
+  "animations_preprompt": "You are an animation selector for a speaking NPC. You will receive ONE sentence the NPC is about to say. Choose exactly one animation name from this list: [Look Away Gesture, Angry Gesture, Clapping, Happy Hand Gesture, Happy Idle, Laughing, Look Around, Sad Idle, Shrugging, Talking, Waving]. Respond with ONLY the animation name.",
   "animations_prompt_suffix": "",
   "configurationComplete": true
 }
