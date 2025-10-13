@@ -1,0 +1,20 @@
+{
+  "iter": 1,
+  "class_instructions": {
+    "sad": "STRONGER: Clearly express feelings of disappointment or loss.",
+    "unc": "STRONGER: if fear: acknowledge anxiety; if surprise: express astonishment; if confusion/hesitation: state uncertainty.",
+    "neu": "STRONGER: Use more engaging language to convey interest or curiosity."
+  },
+  "weak": [
+    "sad",
+    "unc",
+    "neu"
+  ],
+  "persistence": {
+    "pos": 0,
+    "sad": 1,
+    "ang": 0,
+    "unc": 1,
+    "neu": 1
+  }
+}

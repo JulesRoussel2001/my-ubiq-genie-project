@@ -7,12 +7,14 @@ using Ubiq.Networking;
 
 /// <summary>
 /// Receives audio packets on a Ubiq channel, injects them into InjectableAudioSource,
-/// and asks VirtualAssistantController to play an animation on the first PCM of each sentence.
+/// and tells the VirtualAssistantController to play/align the Talking loop.
+/// No Ubiq avatar types are used here.
 /// </summary>
 public class ConversationalAgentManager : MonoBehaviour
 {
-    // Singleton guard (prevents double audio)
+    // ---------- STRICT SINGLETON (prevents double audio) ----------
     private static ConversationalAgentManager s_active;
+
     private void Awake()
     {
         if (s_active != null && s_active != this)
@@ -22,15 +24,22 @@ public class ConversationalAgentManager : MonoBehaviour
         }
         s_active = this;
     }
-    private void OnDestroy() { if (s_active == this) s_active = null; }
+
+    private void OnDestroy()
+    {
+        if (s_active == this) s_active = null;
+    }
 
     [Header("Ubiq")]
     [SerializeField] private NetworkId networkId = new NetworkId(95);
     private NetworkContext context;
 
     [Header("References")]
-    public InjectableAudioSource audioSource;                 // required
-    public VirtualAssistantController assistantController;    // optional
+    [Tooltip("Audio sink that plays raw PCM. Assign the one on your avatar (or a nearby GameObject).")]
+    public InjectableAudioSource audioSource;
+
+    [Tooltip("Optional: will be asked to play/align animations when speech starts and as it progresses.")]
+    public VirtualAssistantController assistantController;
 
     // Sentence framing
     private bool receivingPcm = false;
@@ -38,7 +47,7 @@ public class ConversationalAgentManager : MonoBehaviour
     private int currentSeq = -1;
     private int currentSampleRate = 48000;
 
-    // ACK scheduling
+    // ACK scheduling (armed on first PCM)
     private int pendingAckSeq = -1;
     private float pendingAckWhen = 0f;
 
@@ -56,7 +65,7 @@ public class ConversationalAgentManager : MonoBehaviour
     private struct AudioHeader
     {
         public string type;           // "A"
-        public string targetPeer;     // ignored
+        public string targetPeer;     // ignored here
         public string audioLength;    // bytes as string
         public string animationTitle; // e.g., "Talking"
         public int seq;               // sentence index
@@ -78,7 +87,7 @@ public class ConversationalAgentManager : MonoBehaviour
 
         if (!audioSource)
         {
-            Debug.LogError("[CAM] Missing InjectableAudioSource reference.");
+            Debug.LogError("[CAM] Missing reference: InjectableAudioSource");
         }
     }
 
@@ -86,11 +95,19 @@ public class ConversationalAgentManager : MonoBehaviour
     {
         if (s_active != this) return;
 
+        // Drive the remaining time into the controller while we’re armed
+        if (assistantController && pendingAckSeq != -1)
+        {
+            float remaining = Mathf.Max(0f, pendingAckWhen - Time.time);
+            assistantController.SetRemainingSpeechSeconds(remaining);
+        }
+
         // Fire delayed ACK at audible end
         if (pendingAckSeq != -1 && Time.time >= pendingAckWhen)
         {
             SendAck(pendingAckSeq);
             pendingAckSeq = -1;
+            // Let any queued header/pcm start
             DrainQueuesIfPossible();
         }
     }
@@ -99,7 +116,11 @@ public class ConversationalAgentManager : MonoBehaviour
     public void ProcessMessage(ReferenceCountedSceneGraphMessage data)
     {
         if (s_active != this) return;
-        if (!audioSource) return;
+        if (!audioSource)
+        {
+            Debug.LogError("[CAM] audioSource missing");
+            return;
+        }
 
         var arr = data.data.ToArray();
         if (arr == null || arr.Length == 0) return;
@@ -112,7 +133,8 @@ public class ConversationalAgentManager : MonoBehaviour
                 var json = Encoding.UTF8.GetString(arr);
                 var header = JsonUtility.FromJson<AudioHeader>(json);
 
-                if (seenHeaderSeqs.Contains(header.seq)) return;
+                if (seenHeaderSeqs.Contains(header.seq))
+                    return;
                 seenHeaderSeqs.Add(header.seq);
 
                 headerQueue.Enqueue(header);
@@ -134,6 +156,7 @@ public class ConversationalAgentManager : MonoBehaviour
     {
         if (s_active != this) return;
 
+        // Start a new sentence when possible
         if (!receivingPcm && headerQueue.Count > 0 && pendingAckSeq == -1)
         {
             var header = headerQueue.Dequeue();
@@ -148,11 +171,12 @@ public class ConversationalAgentManager : MonoBehaviour
 
             if (!receivingPcm)
             {
-                SendAck(currentSeq);
+                SendAck(currentSeq); // zero-length
                 return;
             }
         }
 
+        // Consume PCM, inject to audio, manage animation, and keep remaining time updated
         while (receivingPcm && pcmQueue.Count > 0 && bytesRemaining > 0)
         {
             var chunk = pcmQueue.Dequeue();
@@ -168,13 +192,21 @@ public class ConversationalAgentManager : MonoBehaviour
                     assistantController.PlayAnimation(pendingAnimTitle);
                 }
 
-                pendingAckSeq  = currentSeq;   // arm ACK now
+                // arm ACK now
+                pendingAckSeq  = currentSeq;
                 pendingAckWhen = Time.time;
             }
 
-            // estimate audio time to schedule ACK at audible end
+            // estimate audible time to schedule ACK right after playback ends
             float chunkSeconds = take / (2f * currentSampleRate);
             pendingAckWhen = Mathf.Max(pendingAckWhen, Time.time) + chunkSeconds;
+
+            // Keep controller informed about how much speech remains
+            if (assistantController && pendingAckSeq != -1)
+            {
+                float remaining = Mathf.Max(0f, pendingAckWhen - Time.time);
+                assistantController.SetRemainingSpeechSeconds(remaining);
+            }
 
             // Inject exactly 'take' bytes; re-queue leftover for next sentence
             if (take == chunk.Length)
@@ -204,6 +236,7 @@ public class ConversationalAgentManager : MonoBehaviour
             if (bytesRemaining <= 0)
             {
                 receivingPcm = false;
+                // remaining time will naturally count down in Update() until ACK fires
                 return;
             }
         }
@@ -217,5 +250,11 @@ public class ConversationalAgentManager : MonoBehaviour
         var ack = new SentenceAck { type = "SentenceDone", seq = seq };
         var json = JsonUtility.ToJson(ack);
         context.Send(json);
+
+        // tell the controller to settle back to Idle
+        if (assistantController)
+        {
+            assistantController.OnSpeechEnded();
+        }
     }
 }

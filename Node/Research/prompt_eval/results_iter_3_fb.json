@@ -1,0 +1,20 @@
+{
+  "iter": 3,
+  "class_instructions": {
+    "sad": "Acknowledge feelings of loss and emphasize the impact on trust.",
+    "ang": "Express understanding of frustration and invite deeper sharing of feelings.",
+    "unc": "If fear: clarify concerns; if surprise: express curiosity; if confusion: ask for specifics."
+  },
+  "weak": [
+    "sad",
+    "ang",
+    "unc"
+  ],
+  "persistence": {
+    "pos": 0,
+    "sad": 3,
+    "ang": 3,
+    "unc": 3,
+    "neu": 0
+  }
+}

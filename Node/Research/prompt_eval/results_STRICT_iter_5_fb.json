@@ -1,0 +1,20 @@
+{
+  "iter": 5,
+  "class_instructions": {
+    "sad": "STRONGER: Convey deeper feelings of loss and disappointment.",
+    "neu": "STRONGER: Infuse responses with more emotional undertones.",
+    "ang": "STRONGER: Express frustration more explicitly and intensely."
+  },
+  "weak": [
+    "sad",
+    "neu",
+    "ang"
+  ],
+  "persistence": {
+    "pos": 0,
+    "sad": 5,
+    "ang": 1,
+    "unc": 0,
+    "neu": 5
+  }
+}

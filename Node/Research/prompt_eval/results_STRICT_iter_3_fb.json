@@ -1,0 +1,20 @@
+{
+  "iter": 3,
+  "class_instructions": {
+    "sad": "STRONGER: Share deeper feelings about your disappointment or loss.",
+    "ang": "STRONGER: Clearly express your frustration and what triggered it.",
+    "neu": "STRONGER: If confusion: clarify your thoughts; if hesitation: express uncertainty; if indifference: state your feelings directly."
+  },
+  "weak": [
+    "sad",
+    "ang",
+    "neu"
+  ],
+  "persistence": {
+    "pos": 0,
+    "sad": 3,
+    "ang": 1,
+    "unc": 0,
+    "neu": 3
+  }
+}

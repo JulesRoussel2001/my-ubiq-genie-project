@@ -1,0 +1,20 @@
+{
+  "iter": 5,
+  "class_instructions": {
+    "unc": "If fear: acknowledge it; if surprise: clarify; if confusion: ask for details.",
+    "ang": "Be direct about your feelings and ask for specific support.",
+    "neu": "Maintain straightforward, factual responses without emotional embellishment."
+  },
+  "weak": [
+    "unc",
+    "ang",
+    "neu"
+  ],
+  "persistence": {
+    "pos": 0,
+    "sad": 0,
+    "ang": 5,
+    "unc": 5,
+    "neu": 1
+  }
+}

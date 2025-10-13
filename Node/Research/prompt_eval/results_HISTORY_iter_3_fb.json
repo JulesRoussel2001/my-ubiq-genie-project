@@ -1,0 +1,20 @@
+{
+  "iter": 3,
+  "class_instructions": {
+    "neu": "Keep responses straightforward and factual. What specific information do you need?",
+    "unc": "Ask direct questions to clarify uncertainties. What details are you unsure about?",
+    "ang": "Explore the underlying reasons for your frustration. What specifically is bothering you?"
+  },
+  "weak": [
+    "neu",
+    "unc",
+    "ang"
+  ],
+  "persistence": {
+    "pos": 0,
+    "sad": 0,
+    "ang": 1,
+    "unc": 3,
+    "neu": 3
+  }
+}
