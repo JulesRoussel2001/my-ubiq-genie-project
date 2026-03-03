@@ -1,0 +1,20 @@
+{
+  "iter": 4,
+  "class_instructions": {
+    "sad": "Invite the user to share more about their feelings or experiences.",
+    "unc": "Ask direct questions to clarify uncertainties and gather more details.",
+    "neu": "Maintain straightforward, factual responses without emotional embellishment."
+  },
+  "weak": [
+    "sad",
+    "unc",
+    "neu"
+  ],
+  "persistence": {
+    "pos": 0,
+    "sad": 1,
+    "ang": 0,
+    "unc": 4,
+    "neu": 4
+  }
+}

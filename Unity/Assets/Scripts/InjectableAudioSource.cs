@@ -1,42 +1,39 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
 using UnityEngine;
 
 /// <summary>
-/// Pushes audio data directly onto the audiosource with a filter
+/// Pushes 16-bit mono PCM into the AudioSource via OnAudioFilterRead.
+/// Assumes source PCM is 48 kHz (matches your Azure TTS).
 /// </summary>
+[RequireComponent(typeof(AudioSource))]
 public class InjectableAudioSource : MonoBehaviour
 {
-    private ConcurrentQueue<float> samples = new ConcurrentQueue<float>();
+    [Header("Debug")]
+    public bool verboseLogging = true;
+
+    private readonly ConcurrentQueue<float> samples = new ConcurrentQueue<float>();
     private AudioClip clip;
+
+    private static string Ts() => $"{Time.realtimeSinceStartup:F3}s";
 
     private void Start()
     {
-        // Use a clip filled with 1s
-        // This helps us piggyback on Unity's spatialisation using filters
-        Debug.Log("Output sample rate: " + AudioSettings.outputSampleRate);
-        var samples = new float[AudioSettings.outputSampleRate];
-        for(int i = 0; i < samples.Length; i++)
-        {
-            samples[i] = 1.0f;
-        }
+        // 1 second buffer of ones to piggyback spatialization via *=
+        int sr = AudioSettings.outputSampleRate;
+        var ones = new float[sr];
+        for (int i = 0; i < ones.Length; i++) ones[i] = 1f;
 
-        clip = AudioClip.Create("Injectable",
-            samples.Length,
-            1,
-            AudioSettings.outputSampleRate,
-            false);
+        clip = AudioClip.Create("Injectable", ones.Length, 1, sr, false);
 
         var audioSource = GetComponent<AudioSource>();
         audioSource.clip = clip;
-        clip.SetData(samples,0);
+        audioSource.loop = true;              // keep base signal alive
+        clip.SetData(ones, 0);
         audioSource.Play();
-        
-        Debug.Log("Playing test tone for 1 second...");
+
+        if (verboseLogging) Debug.Log($"[{Ts()}][Injectable] init sr={sr}, ones={ones.Length}");
     }
-    
 
     private void OnDestroy()
     {
@@ -47,41 +44,33 @@ public class InjectableAudioSource : MonoBehaviour
         }
     }
 
-
+    /// <summary>
+    /// Enqueue 48 kHz mono 16-bit PCM (little endian).
+    /// </summary>
     public void InjectPcm(Span<byte> bytes)
     {
-        Debug.Log($"[InjectableAudioSource] Received PCM data length: {bytes.Length}");
-        // float[] floatSamples = new float[bytes.Length / 2];
-        for (int i = 0; i < bytes.Length / 2; i++)
+        int sampleCount = bytes.Length / 2;
+        for (int i = 0; i < sampleCount; i++)
         {
-            var sample = (short)(bytes[i * 2] | (bytes[i * 2 + 1] << 8)) / 32768f;
-
-            // 16kHz -> 48kHz
+            float sample = (short)(bytes[i * 2] | (bytes[i * 2 + 1] << 8)) / 32768f;
             samples.Enqueue(sample);
-            // samples.Enqueue(sample);
-            // samples.Enqueue(sample);
+        }
+        if (verboseLogging)
+        {
+            Debug.Log($"[{Ts()}][Injectable] enqueue {bytes.Length} bytes ({sampleCount} samples)");
         }
     }
 
     private void OnAudioFilterRead(float[] data, int channels)
     {
-        for (int dataIdx = 0; dataIdx < data.Length; dataIdx+=channels)
+        for (int dataIdx = 0; dataIdx < data.Length; dataIdx += channels)
         {
-            if (samples.TryDequeue(out float sample))
+            float s = 0f;
+            samples.TryDequeue(out s);
+
+            for (int ch = 0; ch < channels; ch++)
             {
-                for (int channelIdx = 0; channelIdx < channels; channelIdx++)
-                {
-                    // *= because we're including pre-existing spatialization
-                    data[dataIdx + channelIdx] *= sample;
-                }
-            }
-            else
-            {
-                for (int channelIdx = 0; channelIdx < channels; channelIdx++)
-                {
-                    // zero out the pre-existing spatialization
-                    data[dataIdx + channelIdx] = 0.0f;
-                }
+                data[dataIdx + ch] *= s;
             }
         }
     }

@@ -1,0 +1,20 @@
+{
+  "iter": 5,
+  "class_instructions": {
+    "sad": "Encourage sharing specific memories or feelings related to their sadness.",
+    "unc": "Request clarification on their uncertainties and what details they need.",
+    "ang": "Ask what specifically is causing their anger and how it affects them."
+  },
+  "weak": [
+    "sad",
+    "unc",
+    "ang"
+  ],
+  "persistence": {
+    "pos": 0,
+    "sad": 2,
+    "ang": 1,
+    "unc": 5,
+    "neu": 0
+  }
+}

@@ -1,148 +1,127 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using Ubiq.Networking;
-using Ubiq.Dictionaries;
-using Ubiq.Messaging;
-using Ubiq.Logging.Utf8Json;
-using Ubiq.Rooms;
-using Ubiq.Voip;
-using Ubiq.Samples;
-using Ubiq.Avatars;
 
 public class VirtualAssistantController : MonoBehaviour
 {
-    [Header("Animation / Movement")]
-    public HandMover handMover;
-    public float turnSpeed = 10.0f;
-    public Animator animator;
+    [Header("Animation")]
+    [SerializeField] private Animator animator;
+    [SerializeField] private int animatorLayer = 0;
+    [SerializeField] private bool forceSafeAnimatorSettings = true;
 
-    private string assistantSpeechTargetPeerName;
-    private float assistantSpeechVolume;
-    private IPeer lastTargetPeer;
+    [Header("Idle")]
+    [Tooltip("State to return to when speech ends (on ACK from CAM).")]
+    [SerializeField] private string idleState = "Idle";
 
-    private RoomClient roomClient;
-    private AvatarManager avatarManager;
+    [Header("Timing")]
+    [Tooltip("Fallback clip length (s) if runtime length can't be read yet.")]
+    [SerializeField] private float defaultClipSeconds = 1f;
+    [Tooltip("Retrigger near the end while speech has > one clip remaining (0.90–0.98 typical).")]
+    [Range(0.5f, 0.99f)] [SerializeField] private float retriggerAtNormalized = 0.95f;
 
-    private const float SPEECH_VOLUME_FLOOR = 0.005f;
+    // Runtime
+    private float remainingSpeechSeconds = 0f;
+    private string currentStateName = null;
+    private int currentStateHash = 0;
+    private float currentClipSeconds = 1f; // seconds at speed = 1
+    private int idleHash;
 
-    // Called by ConversationalAgentManager to drive hand animations
-    public void UpdateAssistantSpeechStatus(string targetPeerName, float volume)
+    private void Awake()
     {
-        assistantSpeechTargetPeerName = targetPeerName;
-        assistantSpeechVolume = volume;
+        if (!animator) animator = GetComponent<Animator>();
+        if (!animator) { enabled = false; return; }
+
+        if (forceSafeAnimatorSettings)
+        {
+            animator.updateMode = AnimatorUpdateMode.Normal;
+            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            animator.applyRootMotion = false;
+        }
+
+        idleHash = Animator.StringToHash(idleState);
+        currentClipSeconds = defaultClipSeconds;
     }
 
-    void Update()
+    /// Cross-fade to any state; keep native timing.
+    public void PlayAnimation(string state)
     {
-        UpdateHands();
-        UpdateTurn();
+        if (!enabled || animator == null || string.IsNullOrEmpty(state)) return;
+
+        int hash = Animator.StringToHash(state);
+        if (!animator.HasState(animatorLayer, hash)) return;
+
+        currentStateName = state;
+        currentStateHash = hash;
+
+        animator.speed = 1f; // ensure native timing
+        animator.CrossFade(hash, 0.05f, animatorLayer, 0f);
+
+        // Capture active clip length next frame (robust for blend trees)
+        StartCoroutine(CaptureClipLengthNextFrame());
     }
 
-    private void UpdateHands()
+    private IEnumerator CaptureClipLengthNextFrame()
     {
-        if (handMover == null) return;
+        yield return null;
+        currentClipSeconds = GetActiveClipLengthSeconds();
+        if (currentClipSeconds <= 0f) currentClipSeconds = defaultClipSeconds;
+    }
 
-        if (assistantSpeechVolume > SPEECH_VOLUME_FLOOR)
+    /// Called continuously by CAM while audio is being injected.
+    public void SetRemainingSpeechSeconds(float seconds)
+    {
+        remainingSpeechSeconds = Mathf.Max(0f, seconds);
+    }
+
+    /// Called by CAM when speech finishes (ACK). Return to Idle.
+    public void OnSpeechEnded()
+    {
+        remainingSpeechSeconds = 0f;
+        animator.speed = 1f;
+
+        if (!string.IsNullOrEmpty(idleState) && animator.HasState(animatorLayer, idleHash))
         {
-            handMover.Play();
-        }
-        else
-        {
-            handMover.Stop();
+            animator.CrossFade(idleHash, 0.08f, animatorLayer, 0f);
         }
     }
 
-    // This is the method AnimationTriggerReceiver calls
-    public void PlayAnimation(string animName)
+    private void Update()
     {
-        if (animator == null) return;
+        if (remainingSpeechSeconds <= 0f || currentStateHash == 0) return;
 
-        // The Animator must have states or triggers matching these names
-        animator.Play(animName);
+        var info = animator.GetCurrentAnimatorStateInfo(animatorLayer);
+        bool inCurrent = (info.shortNameHash == currentStateHash) || info.IsName(currentStateName);
+        if (!inCurrent) return;
+
+        // Active clip length (prefer live value each frame)
+        float clipSec = GetActiveClipLengthSeconds();
+        if (clipSec <= 0f) clipSec = currentClipSeconds > 0f ? currentClipSeconds : defaultClipSeconds;
+
+        // Wrap normalized time to [0,1) so this works for looping and non-looping clips
+        float t01 = info.normalizedTime % 1f; if (t01 < 0f) t01 += 1f;
+
+        // RULE: While we have MORE than one full clip of speech left, retrigger at the end (no speed scaling).
+        if (remainingSpeechSeconds > clipSec)
+        {
+            if (t01 >= retriggerAtNormalized)
+            {
+                animator.speed = 1f; // keep native speed
+                animator.Play(currentStateHash, animatorLayer, 0f);
+            }
+            return; // keep repeating until we drop to ≤ one clip
+        }
+
+        // Once remainingSpeechSeconds ≤ clip length:
+        // - Do NOT retrigger
+        // - Do NOT change speed
+        // Let the current play finish naturally; CAM will call OnSpeechEnded() → Idle.
     }
 
-    private void UpdateTurn()
+    /// Length (seconds) of the primary active clip on the current state/layer.
+    private float GetActiveClipLengthSeconds()
     {
-        // Lazy‐initialize RoomClient and AvatarManager
-        if (roomClient == null)
-        {
-            roomClient = NetworkScene.Find(this).GetComponent<RoomClient>();
-            if (roomClient == null) return;
-        }
-        if (avatarManager == null)
-        {
-            avatarManager = roomClient.GetComponentInChildren<AvatarManager>();
-            if (avatarManager == null) return;
-        }
-
-        IPeer targetPeer = null;
-
-        // 1) If LLM told us who to address, find them
-        if (!string.IsNullOrEmpty(assistantSpeechTargetPeerName))
-        {
-            foreach (var peer in roomClient.Peers)
-            {
-                if (peer["ubiq.samples.social.name"] == assistantSpeechTargetPeerName)
-                {
-                    targetPeer = peer;
-                    break;
-                }
-            }
-            if (roomClient.Me["ubiq.samples.social.name"] == assistantSpeechTargetPeerName)
-            {
-                targetPeer = roomClient.Me;
-            }
-        }
-        // 2) Otherwise, pick whoever is currently speaking the loudest
-        else
-        {
-            float loudest = 0f;
-            foreach (var avatar in avatarManager.Avatars)
-            {
-                var src = avatar.GetComponentInChildren<AudioSource>();
-                if (src == null) continue;
-
-                var vol = src.GetComponent<AudioSourceVolume>()?.volume ?? 0f;
-                if (vol > loudest && vol > SPEECH_VOLUME_FLOOR)
-                {
-                    loudest = vol;
-                    targetPeer = avatar.Peer;
-                }
-            }
-        }
-
-        // Fallback to last known
-        if (targetPeer == null)
-        {
-            targetPeer = lastTargetPeer;
-            if (targetPeer == null) return;
-        }
-
-        // Find that peer’s avatar to get head position
-        Ubiq.Avatars.Avatar targetAvatar = null;
-        foreach (var avatar in avatarManager.Avatars)
-        {
-            if (avatar.Peer == targetPeer)
-            {
-                targetAvatar = avatar;
-                break;
-            }
-        }
-        if (targetAvatar == null) return;
-
-        var floating = targetAvatar.GetComponentInChildren<FloatingAvatar>();
-        if (floating == null) return;
-
-        // Turn to face them
-        var pos = floating.head.position;
-        var dir = new Vector3(pos.x - transform.position.x, 0, pos.z - transform.position.z);
-        transform.rotation = Quaternion.Slerp(
-            transform.rotation,
-            Quaternion.LookRotation(dir),
-            turnSpeed * Time.deltaTime
-        );
-
-        lastTargetPeer = targetPeer;
+        var clips = animator.GetCurrentAnimatorClipInfo(animatorLayer);
+        if (clips != null && clips.Length > 0 && clips[0].clip)
+            return Mathf.Max(0f, clips[0].clip.length);
+        return 0f;
     }
 }

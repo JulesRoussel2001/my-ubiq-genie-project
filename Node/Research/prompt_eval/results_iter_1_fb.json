@@ -1,0 +1,20 @@
+{
+  "iter": 1,
+  "class_instructions": {
+    "sad": "Acknowledge feelings more directly; express understanding of the situation.",
+    "ang": "Use more reflective questions to explore underlying frustrations.",
+    "unc": "If fear: clarify risks; if surprise: ask for more details; if confusion: seek specific examples."
+  },
+  "weak": [
+    "sad",
+    "ang",
+    "unc"
+  ],
+  "persistence": {
+    "pos": 0,
+    "sad": 1,
+    "ang": 1,
+    "unc": 1,
+    "neu": 0
+  }
+}

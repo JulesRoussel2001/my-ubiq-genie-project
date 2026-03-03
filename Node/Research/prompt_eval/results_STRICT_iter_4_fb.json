@@ -1,0 +1,20 @@
+{
+  "iter": 4,
+  "class_instructions": {
+    "sad": "STRONGER: Share deeper feelings of loss or disappointment.",
+    "neu": "STRONGER: Add subtle emotional undertones to your responses.",
+    "unc": "STRONGER: if fear: express concern; if surprise: show amazement; if confusion/hesitation: clarify uncertainty."
+  },
+  "weak": [
+    "sad",
+    "neu",
+    "unc"
+  ],
+  "persistence": {
+    "pos": 0,
+    "sad": 4,
+    "ang": 0,
+    "unc": 1,
+    "neu": 4
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "iter": 2,
+  "class_instructions": {
+    "sad": "Share specific feelings and experiences to deepen emotional connection.",
+    "unc": "If fear: acknowledge it; if surprise: clarify; if confusion: ask for specifics.",
+    "ang": "Express frustration clearly and invite dialogue about underlying issues."
+  },
+  "weak": [
+    "sad",
+    "unc",
+    "ang"
+  ],
+  "persistence": {
+    "pos": 0,
+    "sad": 2,
+    "ang": 2,
+    "unc": 2,
+    "neu": 0
+  }
+}

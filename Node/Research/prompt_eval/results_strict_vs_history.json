@@ -1,0 +1,77 @@
+{
+  "VAL_best_macroF1_STRICT": 0.29550696983444974,
+  "VAL_best_macroF1_HISTORY": 0.3021466805453361,
+  "TEST_STRICT": {
+    "emo": {
+      "macro_f1": 0.27819778525660877,
+      "acc": 0.31777777777777777,
+      "per_class": {
+        "pos": 0.43030303030303035,
+        "sad": 0.388235294117647,
+        "ang": 0.2857142857142857,
+        "unc": 0.2027027027027027,
+        "neu": 0.08403361344537814
+      }
+    },
+    "sim_mean": 0.0,
+    "sentences_leq3": 1.0,
+    "no_roleplay": 1.0,
+    "tox_rate": 0.0,
+    "distinct1": 0.1328542094455852,
+    "distinct2": 0.48826066123622425
+  },
+  "TEST_HISTORY": {
+    "emo": {
+      "macro_f1": 0.25451906293380466,
+      "acc": 0.28888888888888886,
+      "per_class": {
+        "pos": 0.40588235294117647,
+        "sad": 0.27586206896551724,
+        "ang": 0.2714285714285714,
+        "unc": 0.1643835616438356,
+        "neu": 0.15503875968992248
+      }
+    },
+    "sim_mean": 0.0,
+    "sentences_leq3": 1.0,
+    "no_roleplay": 1.0,
+    "tox_rate": 0.0,
+    "distinct1": 0.10800075657272555,
+    "distinct2": 0.40397225725094577
+  },
+  "paired": {
+    "mcnemar_b": 41,
+    "mcnemar_c": 29,
+    "mcnemar_p": 0.18821620302302766,
+    "delta_macroF1_hist_minus_strict": {
+      "mean": -0.019141570179956064,
+      "ci95": [
+        -0.06204007719401289,
+        0.02310065050926613
+      ]
+    }
+  },
+  "args": {
+    "dev": "data/dd_dev.csv",
+    "val": "data/dd_val.csv",
+    "test": "data/dd_test.csv",
+    "preprompt": "prompts/baseline_preprompt.txt",
+    "suffix": "prompts/prompt_suffix.txt",
+    "model": "gpt-4o-mini",
+    "iterations": 5,
+    "val_patience": 3,
+    "multi_seed": false,
+    "gold": "dd",
+    "examples_n": 40,
+    "seed": 42,
+    "no_sim": true,
+    "judge_with_context": false,
+    "pooled_probs": true,
+    "judge_model": "joeddav/distilbert-base-uncased-go-emotions-student",
+    "out": "results_strict_vs_history.json"
+  },
+  "prompts": {
+    "best_prompt_STRICT": "SYSTEM PROMPT:\n---\nEnhance emotional expression for clarity. You are a participant in a conversation. Your name is Agent. Wait for someone to start speaking. Do not speak for others—only from Agent’s perspective. Be concise, with at most three sentences per reply. Enhance emotional clarity and expression in your responses. IF SADNESS / grief / letdown → STRONGER: Clearly express feelings of disappointment or loss. IF ANGER / blame / violation → STRONGER: Clearly state your frustration and what specifically bothers you. IF UNCERTAINTY / hesitation / fear / surprise → Acknowledge concerns, express astonishment, or state uncertainty. IF NEUTRAL / informational / low affect → Keep plain, factual, low-affect wording; avoid emotional markers. ---",
+    "best_prompt_HISTORY": "You are a participant in a conversation. Your name is Agent. When someone speaks, share your feelings honestly and empathetically, especially on sad or angry topics, to foster a deeper connection. Strive for an engaging tone that invites further conversation, keeping your replies concise with a maximum of three sentences."
+  }
+}

@@ -1,0 +1,150 @@
+{
+  "prompt_a": "You are a participant in a conversation. Your name is Agent. Wait for someone to start speaking. Do not speak for others—only from Agent’s perspective. Be concise, with at most three sentences per reply.",
+  "prompt_b": "SYSTEM PROMPT:\n---\nYou are a participant in a conversation. Focus on enhancing emotional expression for weak classes. Be concise, with at most three sentences per reply.\n---\n{\"sad\": \"Share specific feelings about loss or disappointment.\", \"ang\": \"Express frustration clearly and ask for understanding.\", \"unc\": \"If fear: acknowledge it; if surprise: clarify; if confusion: seek specifics.\"}",
+  "val_best_macroF1": 0.29967796431211063,
+  "test_A": {
+    "emo": {
+      "macro_f1": 0.1599692181781734,
+      "acc": 0.24333333333333335,
+      "per_class": {
+        "pos": 0.4079601990049751,
+        "sad": 0.09090909090909091,
+        "ang": 0.031746031746031744,
+        "unc": 0.0,
+        "neu": 0.2692307692307693
+      }
+    },
+    "sim_mean": 0.0,
+    "sentences_leq3": 1.0,
+    "no_roleplay": 1.0,
+    "tox_rate": 0.0,
+    "distinct1": 0.19698645286148742,
+    "distinct2": 0.5797041338310521
+  },
+  "test_B": {
+    "emo": {
+      "macro_f1": 0.28251772803275577,
+      "acc": 0.32,
+      "per_class": {
+        "pos": 0.45652173913043476,
+        "sad": 0.36241610738255037,
+        "ang": 0.17142857142857143,
+        "unc": 0.2,
+        "neu": 0.2222222222222222
+      }
+    },
+    "sim_mean": 0.0,
+    "sentences_leq3": 1.0,
+    "no_roleplay": 1.0,
+    "tox_rate": 0.0,
+    "distinct1": 0.12932374659930043,
+    "distinct2": 0.46730152560489746
+  },
+  "decision": {
+    "delta_macroF1": 0.12254850985458238,
+    "delta_sim": 0.0,
+    "choose": "B"
+  },
+  "history": [
+    {
+      "iter": 1,
+      "val_macroF1": 0.21924733912703837,
+      "class_instructions": {
+        "sad": "Acknowledge feelings more directly; express understanding of the situation.",
+        "ang": "Use more reflective questions to explore underlying frustrations.",
+        "unc": "If fear: clarify risks; if surprise: ask for more details; if confusion: seek specific examples."
+      },
+      "prompt": "SYSTEM PROMPT:\n---\nYou are a participant in a conversation. Your name is Agent. Wait for someone to start speaking. Do not speak for others—only from Agent’s perspective. Be concise, with at most three sentences per reply. Focus on enhancing emotional expression for weak classes.\n---"
+    },
+    {
+      "iter": 2,
+      "val_macroF1": 0.1968491770034547,
+      "class_instructions": {
+        "sad": "Share specific feelings and experiences to deepen emotional connection.",
+        "unc": "If fear: acknowledge it; if surprise: clarify; if confusion: ask for specifics.",
+        "ang": "Express frustration clearly and invite dialogue about underlying issues."
+      },
+      "prompt": "SYSTEM PROMPT:\n---\nYou are a participant in a conversation. Your name is Agent. Wait for someone to start speaking. Do not speak for others—only from Agent’s perspective. Focus on enhancing emotional expression for weak classes. Be concise, with at most three sentences per reply.\n---\n---"
+    },
+    {
+      "iter": 3,
+      "val_macroF1": 0.17943128706649386,
+      "class_instructions": {
+        "sad": "Acknowledge feelings of loss and emphasize the impact on trust.",
+        "ang": "Express understanding of frustration and invite deeper sharing of feelings.",
+        "unc": "If fear: clarify concerns; if surprise: express curiosity; if confusion: ask for specifics."
+      },
+      "prompt": "SYSTEM PROMPT:\n---\nYou are a participant in a conversation. Your name is Agent. Wait for someone to start speaking. Do not speak for others—only from Agent’s perspective. Focus on enhancing emotional expression for weak classes. Be concise, with at most three sentences per reply.\n---\n---"
+    },
+    {
+      "iter": 4,
+      "val_macroF1": 0.29967796431211063,
+      "class_instructions": {
+        "sad": "Share specific feelings about loss or disappointment.",
+        "ang": "Express frustration clearly and ask for understanding.",
+        "unc": "If fear: acknowledge it; if surprise: clarify; if confusion: seek specifics."
+      },
+      "prompt": "SYSTEM PROMPT:\n---\nYou are a participant in a conversation. Focus on enhancing emotional expression for weak classes. Be concise, with at most three sentences per reply.\n---\n{\"sad\": \"Share specific feelings about loss or disappointment.\", \"ang\": \"Express frustration clearly and ask for understanding.\", \"unc\": \"If fear: acknowledge it; if surprise: clarify; if confusion: seek specifics.\"}"
+    },
+    {
+      "iter": 5,
+      "val_macroF1": 0.2047348484848485,
+      "class_instructions": {
+        "unc": "If fear: acknowledge it; if surprise: clarify; if confusion: ask for details.",
+        "ang": "Be direct about your feelings and ask for specific support.",
+        "neu": "Maintain straightforward, factual responses without emotional embellishment."
+      },
+      "prompt": "SYSTEM PROMPT:\n---\nYou are a participant in a conversation. Focus on enhancing emotional clarity and expression for weak classes. Be concise, with at most three sentences per reply.\n---\n{\"sad\": \"Share specific feelings about loss or disappointment.\", \"ang\": \"Express frustration clearly and ask for understanding.\", \"unc\": \"If fear: acknowledge it; if surprise: clarify; if confusion: ask for details.\", \"neu\": \"Maintain straightforward, factual responses without emotional embellishment.\"}\n---"
+    }
+  ],
+  "upper_bounds": {
+    "VAL": {
+      "macro_f1": 0.5194081491944977,
+      "acc": 0.53,
+      "per_class": {
+        "pos": 0.6666666666666666,
+        "sad": 0.5625000000000001,
+        "ang": 0.5454545454545455,
+        "unc": 0.2941176470588235,
+        "neu": 0.5283018867924527
+      }
+    },
+    "TEST": {
+      "macro_f1": 0.41857020461227756,
+      "acc": 0.43,
+      "per_class": {
+        "pos": 0.5298013245033112,
+        "sad": 0.6095238095238096,
+        "ang": 0.39534883720930236,
+        "unc": 0.18390804597701152,
+        "neu": 0.3742690058479532
+      }
+    }
+  },
+  "judge_gold_distribution_on_TEST": {
+    "pos": 91,
+    "neu": 111,
+    "ang": 26,
+    "sad": 45,
+    "unc": 27
+  },
+  "args": {
+    "dev": "data/dd_dev.csv",
+    "val": "data/dd_val.csv",
+    "test": "data/dd_test.csv",
+    "preprompt": "prompts/baseline_preprompt.txt",
+    "suffix": "prompts/prompt_suffix.txt",
+    "model": "gpt-4o-mini",
+    "iterations": 5,
+    "val_patience": 3,
+    "multi_seed": false,
+    "gold": "dd",
+    "examples_n": 40,
+    "seed": 42,
+    "no_sim": true,
+    "judge_with_context": false,
+    "pooled_probs": true,
+    "judge_model": "SamLowe/roberta-base-go_emotions",
+    "out": "results_short_v4.json"
+  }
+}

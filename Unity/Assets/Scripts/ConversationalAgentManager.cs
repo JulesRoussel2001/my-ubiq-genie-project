@@ -1,108 +1,260 @@
+using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using Ubiq.Messaging;
-using System;
+using Ubiq.Networking;
 
+/// <summary>
+/// Receives audio packets on a Ubiq channel, injects them into InjectableAudioSource,
+/// and tells the VirtualAssistantController to play/align the Talking loop.
+/// No Ubiq avatar types are used here.
+/// </summary>
 public class ConversationalAgentManager : MonoBehaviour
 {
-    private class AssistantSpeechUnit
-    {
-        public float startTime;
-        public int samples;
-        public string speechTargetName;
+    // ---------- STRICT SINGLETON (prevents double audio) ----------
+    private static ConversationalAgentManager s_active;
 
-        public float endTime { get { return startTime + samples/(float)AudioSettings.outputSampleRate; } }
+    private void Awake()
+    {
+        if (s_active != null && s_active != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        s_active = this;
     }
 
-    private NetworkId networkId = new NetworkId(95);
+    private void OnDestroy()
+    {
+        if (s_active == this) s_active = null;
+    }
+
+    [Header("Ubiq")]
+    [SerializeField] private NetworkId networkId = new NetworkId(95);
     private NetworkContext context;
 
+    [Header("References")]
+    [Tooltip("Audio sink that plays raw PCM. Assign the one on your avatar (or a nearby GameObject).")]
     public InjectableAudioSource audioSource;
+
+    [Tooltip("Optional: will be asked to play/align animations when speech starts and as it progresses.")]
     public VirtualAssistantController assistantController;
-    public AudioSourceVolume volume;
 
-    private string speechTargetName;
+    // Sentence framing
+    private bool receivingPcm = false;
+    private int bytesRemaining = 0;
+    private int currentSeq = -1;
+    private int currentSampleRate = 48000;
 
-    private List<AssistantSpeechUnit> speechUnits = new List<AssistantSpeechUnit>();
+    // ACK scheduling (armed on first PCM)
+    private int pendingAckSeq = -1;
+    private float pendingAckWhen = 0f;
+
+    // Anim timing
+    private string pendingAnimTitle = null;
+    private bool animStartedForSentence = false;
+
+    // Queues & guards
+    private readonly Queue<AudioHeader> headerQueue = new Queue<AudioHeader>();
+    private readonly Queue<byte[]> pcmQueue = new Queue<byte[]>();
+    private readonly HashSet<int> seenHeaderSeqs = new HashSet<int>();
+    private int lastAckedSeq = -1;
 
     [Serializable]
-    private struct AnimationAudio
+    private struct AudioHeader
     {
-        public string type;
-        public string targetPeer;
-        public string audioLength;
-        public string animationTitle;
+        public string type;           // "A"
+        public string targetPeer;     // ignored here
+        public string audioLength;    // bytes as string
+        public string animationTitle; // e.g., "Talking"
+        public int seq;               // sentence index
+        public int sampleRate;        // Hz
     }
 
-    // Start is called before the first frame update
-    void Start()
+    [Serializable]
+    private struct SentenceAck
     {
-        context = NetworkScene.Register(this,networkId);
-
+        public string type; // "SentenceDone"
+        public int seq;
     }
 
-    // Update is called once per frame
-    void Update()
+    private void Start()
     {
-        while(speechUnits.Count > 0)
-        {
-            if (Time.time > speechUnits[0].endTime)
-            {
-                speechUnits.RemoveAt(0);
-            }
-            else
-            {
-                break;
-            }
-        }
+        if (s_active != this) return;
 
-        if (assistantController)
-        {
-            var speechTarget = null as string;
-            if (speechUnits.Count > 0)
-            {
-                speechTarget = speechUnits[0].speechTargetName;
-            }
+        context = NetworkScene.Register(this, networkId);
 
-            assistantController.UpdateAssistantSpeechStatus(speechTarget,volume.volume);
+        if (!audioSource)
+        {
+            Debug.LogError("[CAM] Missing reference: InjectableAudioSource");
         }
     }
 
+    private void Update()
+    {
+        if (s_active != this) return;
+
+        // Drive the remaining time into the controller while we’re armed
+        if (assistantController && pendingAckSeq != -1)
+        {
+            float remaining = Mathf.Max(0f, pendingAckWhen - Time.time);
+            assistantController.SetRemainingSpeechSeconds(remaining);
+        }
+
+        // Fire delayed ACK at audible end
+        if (pendingAckSeq != -1 && Time.time >= pendingAckWhen)
+        {
+            SendAck(pendingAckSeq);
+            pendingAckSeq = -1;
+            // Let any queued header/pcm start
+            DrainQueuesIfPossible();
+        }
+    }
+
+    // Receiver for channel 95 (audio)
     public void ProcessMessage(ReferenceCountedSceneGraphMessage data)
     {
-        Debug.Assert(audioSource);
-
-        // If the data is less than 100 bytes, then we have have received the audio info header
-
-        if (data.data.Length < 100)
+        if (s_active != this) return;
+        if (!audioSource)
         {
-            // Try to parse the data as a message, if it fails, then we have received the audio data
-            AnimationAudio message;
-            try
-            {
-                message = data.FromJson<AnimationAudio>();
-
-                speechTargetName = message.targetPeer;
-                Debug.Log("Received audio for peer: " + message.targetPeer + " with length: " + message.audioLength);
-                return;
-            }
-            catch (Exception e)
-            {
-                Debug.Log("Received audio data");
-            }
-        }
-
-        if (data.data.Length < 200)
-        {
+            Debug.LogError("[CAM] audioSource missing");
             return;
         }
 
-        var speechUnit = new AssistantSpeechUnit();
-        var prevUnit = speechUnits.Count > 0 ? speechUnits[speechUnits.Count-1] : null;
-        speechUnit.startTime = prevUnit != null ? prevUnit.endTime : Time.time;
-        speechUnit.samples = data.data.Length/2;
-        speechUnit.speechTargetName = speechTargetName;
-        speechUnits.Add(speechUnit);
-        audioSource.InjectPcm(data.data.ToArray());
+        var arr = data.data.ToArray();
+        if (arr == null || arr.Length == 0) return;
+
+        // Header?
+        if (arr[0] == (byte)'{')
+        {
+            try
+            {
+                var json = Encoding.UTF8.GetString(arr);
+                var header = JsonUtility.FromJson<AudioHeader>(json);
+
+                if (seenHeaderSeqs.Contains(header.seq))
+                    return;
+                seenHeaderSeqs.Add(header.seq);
+
+                headerQueue.Enqueue(header);
+                DrainQueuesIfPossible();
+                return;
+            }
+            catch
+            {
+                // fall through as PCM if JSON parse failed
+            }
+        }
+
+        // PCM chunk
+        pcmQueue.Enqueue(arr);
+        DrainQueuesIfPossible();
+    }
+
+    private void DrainQueuesIfPossible()
+    {
+        if (s_active != this) return;
+
+        // Start a new sentence when possible
+        if (!receivingPcm && headerQueue.Count > 0 && pendingAckSeq == -1)
+        {
+            var header = headerQueue.Dequeue();
+
+            if (!int.TryParse(header.audioLength, out bytesRemaining)) bytesRemaining = 0;
+            currentSeq        = header.seq;
+            currentSampleRate = header.sampleRate > 0 ? header.sampleRate : 48000;
+            receivingPcm      = bytesRemaining > 0;
+
+            pendingAnimTitle = string.IsNullOrEmpty(header.animationTitle) ? "Talking" : header.animationTitle;
+            animStartedForSentence = false;
+
+            if (!receivingPcm)
+            {
+                SendAck(currentSeq); // zero-length
+                return;
+            }
+        }
+
+        // Consume PCM, inject to audio, manage animation, and keep remaining time updated
+        while (receivingPcm && pcmQueue.Count > 0 && bytesRemaining > 0)
+        {
+            var chunk = pcmQueue.Dequeue();
+            int take = Mathf.Min(bytesRemaining, chunk.Length);
+            if (take <= 0) continue;
+
+            if (!animStartedForSentence)
+            {
+                animStartedForSentence = true;
+
+                if (assistantController)
+                {
+                    assistantController.PlayAnimation(pendingAnimTitle);
+                }
+
+                // arm ACK now
+                pendingAckSeq  = currentSeq;
+                pendingAckWhen = Time.time;
+            }
+
+            // estimate audible time to schedule ACK right after playback ends
+            float chunkSeconds = take / (2f * currentSampleRate);
+            pendingAckWhen = Mathf.Max(pendingAckWhen, Time.time) + chunkSeconds;
+
+            // Keep controller informed about how much speech remains
+            if (assistantController && pendingAckSeq != -1)
+            {
+                float remaining = Mathf.Max(0f, pendingAckWhen - Time.time);
+                assistantController.SetRemainingSpeechSeconds(remaining);
+            }
+
+            // Inject exactly 'take' bytes; re-queue leftover for next sentence
+            if (take == chunk.Length)
+            {
+                audioSource.InjectPcm(chunk);
+            }
+            else
+            {
+                var head = new byte[take];
+                Buffer.BlockCopy(chunk, 0, head, 0, take);
+                audioSource.InjectPcm(head);
+
+                var tailLen = chunk.Length - take;
+                if (tailLen > 0)
+                {
+                    var tail = new byte[tailLen];
+                    Buffer.BlockCopy(chunk, take, tail, 0, tailLen);
+                    var tmpQ = new Queue<byte[]>();
+                    tmpQ.Enqueue(tail);
+                    while (pcmQueue.Count > 0) tmpQ.Enqueue(pcmQueue.Dequeue());
+                    while (tmpQ.Count > 0) pcmQueue.Enqueue(tmpQ.Dequeue());
+                }
+            }
+
+            bytesRemaining -= take;
+
+            if (bytesRemaining <= 0)
+            {
+                receivingPcm = false;
+                // remaining time will naturally count down in Update() until ACK fires
+                return;
+            }
+        }
+    }
+
+    private void SendAck(int seq)
+    {
+        if (seq == lastAckedSeq) return;
+        lastAckedSeq = seq;
+
+        var ack = new SentenceAck { type = "SentenceDone", seq = seq };
+        var json = JsonUtility.ToJson(ack);
+        context.Send(json);
+
+        // tell the controller to settle back to Idle
+        if (assistantController)
+        {
+            assistantController.OnSpeechEnded();
+        }
     }
 }

@@ -1,0 +1,20 @@
+{
+  "iter": 2,
+  "class_instructions": {
+    "sad": "STRONGER: Share your feelings more openly to convey depth.",
+    "unc": "STRONGER: if fear: express your worries; if surprise: share your astonishment; if confusion/hesitation: clarify your thoughts.",
+    "neu": "STRONGER: Add personal feelings to create a deeper connection."
+  },
+  "weak": [
+    "sad",
+    "unc",
+    "neu"
+  ],
+  "persistence": {
+    "pos": 0,
+    "sad": 2,
+    "ang": 0,
+    "unc": 2,
+    "neu": 2
+  }
+}
