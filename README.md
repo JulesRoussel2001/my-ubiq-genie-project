@@ -1,3 +1,21 @@
+# 🛑 Master's Thesis Implementation: Synchronous Virtual Agents & Affect-Consistent LLM Optimization
+**Author:** Jules Roussel | MSc Machine Learning & Data Science @ UCL (Distinction)
+
+> **Important Note:** This repository contains my Master's Thesis engineering work, built on top of the Ubiq-Genie framework. While the original framework setup instructions remain below, my specific technical and machine learning contributions to this repository include two major tracks:
+
+### 1. Real-Time Distributed Pipeline & Audio Synchronization
+* **Sentence-Synchronous Orchestration:** Engineered a Node.js/TypeScript orchestrator to split user turns into sentences and execute a blocking `compute → send → wait(ACK)` loop for real-time control.
+* **Byte-Accurate Audio Streaming:** Implemented custom wire protocols to stream 48 kHz, 16-bit mono PCM in fixed chunks. Triggered closed-vocabulary Mixamo gestures exactly on the first audio PCM sample to ensure perfect audible speech alignment.
+* **Deterministic Guardrails:** Designed NLP guardrails using a five-way affect space (positive, sadness, anger, uncertainty, neutral) to veto gesture-speech mismatches and map to conservative Azure Text-to-Speech styles.
+
+### 2. Offline Actor-Critic Prompt Optimization (LLM Evaluation)
+* **Stratified Offline Search:** Built an offline actor-critic prompt optimization loop using stratified DEV/VAL/TEST splits on dialogue datasets like DailyDialog.
+* **Objective NLP Metrics:** Scored generations using a frozen GoEmotions classifier pooled into five buckets. Evaluated prompt performance systematically using macro-F1 to handle class imbalances.
+* **Hard Quality & Safety Gates:** Enforced strict deployment gates during candidate selection, ensuring zero toxicity, compliance with a ≤3-sentence limit, and zero roleplay or meta-token leakage.
+
+---
+*(Original Ubiq-Genie Framework Documentation follows below)*
+
 # Welcome to Ubiq-Genie
 
 ![Illustrations of two sample demos available in Ubiq-Genie](header.png)
